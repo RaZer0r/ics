@@ -62,6 +62,7 @@ class ics_Sensor(Entity):
 		self._n_skip = config.get(CONF_N_SKIP)
 		self._description_in_state = config.get(CONF_DESCRIPTION_IN_STATE)
 		self._icon = config.get(CONF_ICON)
+		self._user_agent = config.get(CONF_USER_AGENT)
 
 		_LOGGER.debug("ICS config: ")
 		_LOGGER.debug("\tname: " + self._name)
@@ -80,6 +81,7 @@ class ics_Sensor(Entity):
 		_LOGGER.debug("\tn_skip: " + str(self._n_skip))
 		_LOGGER.debug("\tdescription_in_state: " + str(self._description_in_state))
 		_LOGGER.debug("\ticon: " + str(self._icon))
+		_LOGGER.debug("\tuser_agent: " + str(self._user_agent))
 
 		self._lastUpdate = -1
 		self.ics = {
@@ -176,7 +178,7 @@ class ics_Sensor(Entity):
 	async def get_data(self):
 		"""Update the actual data."""
 		try:
-			cal_string = await async_load_data(self.hass, self._url)
+			cal_string = await async_load_data(self.hass, self._url, self._user_agent)
 			icalendar.use_pytz()
 			cal = icalendar.Calendar.from_ical(cal_string)
 

@@ -27,7 +27,8 @@
                     "show_ongoing": "Show events that are ongoing",
                     "group_events": "Group events (show multiple)",
                     "n_skip": "Amount of events to skip",
-                    "description_in_state": "Show description in state"
+                    "description_in_state": "Show description in state",
+                    "user_agent": "User Agent"
                 }
             }
         },
@@ -68,7 +69,8 @@
                     "show_ongoing": "Show events that are ongoing",
                     "group_events": "Group events (show multiple)",
                     "n_skip": "Amount of events to skip",
-                    "description_in_state": "Show description in state"
+                    "description_in_state": "Show description in state",
+                    "user_agent": "User Agent"
                 }
             }
         },
