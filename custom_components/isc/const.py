@@ -43,6 +43,7 @@ CONF_USER_AGENT = "user_agent"
 CONF_HEADER_NAME = "header_name"
 CONF_HEADER_VALUE = "header_value"
 CONF_HEADERS = "headers"
+CONF_VERBOSE_LOGGING = "verbose_logging"
 
 
 # defaults
@@ -95,6 +96,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
 	vol.Optional(CONF_HEADER_VALUE, default=""): cv.string,
 	# YAML: accept a mapping of headers
 	vol.Optional(CONF_HEADERS, default={}): {cv.string: cv.string},
+	vol.Optional(CONF_VERBOSE_LOGGING, default=False): cv.boolean,
 })
 
 
@@ -130,6 +132,7 @@ def ensure_config(user_input, hass):
 	out[CONF_HEADER_NAME] = ""
 	out[CONF_HEADER_VALUE] = ""
 	out[CONF_HEADERS] = {}
+	out[CONF_VERBOSE_LOGGING] = False
 	out[CONF_ID] = get_next_id(hass)
 
 	if user_input is not None:
@@ -201,6 +204,8 @@ def ensure_config(user_input, hass):
 								k, v = line.split(':', 1)
 								headers[k.strip()] = v.strip()
 						out[CONF_HEADERS] = headers
+			if CONF_VERBOSE_LOGGING in user_input:
+				out[CONF_VERBOSE_LOGGING] = user_input[CONF_VERBOSE_LOGGING]
 	return out
 
 
@@ -218,7 +223,7 @@ async def check_data(user_input, hass, own_id=None):
 			# single header fields (backwards compat)
 			if user_input.get(CONF_HEADER_NAME):
 				_headers[user_input.get(CONF_HEADER_NAME)] = user_input.get(CONF_HEADER_VALUE, "")
-			cal_string = await async_load_data(hass, user_input[CONF_ICS_URL], user_input.get(CONF_USER_AGENT, ""), headers=_headers)
+			cal_string = await async_load_data(hass, user_input[CONF_ICS_URL], user_input.get(CONF_USER_AGENT, ""), headers=_headers, verbose=user_input.get(CONF_VERBOSE_LOGGING, False))
 			try:
 				Calendar.from_ical(cal_string)
 			except Exception:
@@ -303,7 +308,7 @@ def create_form(page, user_input, hass):
 	return data_schema
 
 
-def _load_data(url,user_agent, headers=None, header_name=None, header_value=None):
+def _load_data(url,user_agent, headers=None, header_name=None, header_value=None, verbose=False):
 	"""Load data from URL, exported to const to call it from sensor and from config_flow."""
 	# prepare headers
 	built = {}
@@ -316,10 +321,36 @@ def _load_data(url,user_agent, headers=None, header_name=None, header_value=None
 	if header_name is not None and header_name != "" and header_value is not None:
 		built[header_name] = header_value
 	if(url.lower().startswith("file://")):
+		# log curl-equivalent for debugging
+		if verbose:
+			try:
+				curl_parts = ["curl -sS --location --fail"]
+				curl_parts.append(f"'{url}'")
+				for k, v in built.items():
+					curl_parts.append(f"-H '{k}: {v}'")
+				curl_cmd = ' '.join(curl_parts)
+				_LOGGER.debug("ICS fetch (curl): %s", curl_cmd)
+			except Exception:
+				pass
 		req = Request(url=url, data=None, headers=built)
 		return urlopen(req).read().decode('ISO-8859-1')
-	return requests.get(url, headers=built, allow_redirects=True).content
+	# log curl-equivalent for debugging
+	if verbose:
+		try:
+			curl_parts = ["curl -sS --location --fail"]
+			curl_parts.append(f"'{url}'")
+			for k, v in built.items():
+				curl_parts.append(f"-H '{k}: {v}'")
+			curl_cmd = ' '.join(curl_parts)
+			_LOGGER.debug("ICS fetch (curl): %s", curl_cmd)
+		except Exception:
+			pass
+	resp = requests.get(url, headers=built, allow_redirects=True)
+	# also log status code for quick diagnostics (only if verbose)
+	if verbose:
+		_LOGGER.debug("ICS fetch response: %s %s", resp.status_code, resp.headers.get('content-type'))
+	return resp.content
 
-async def async_load_data(hass, url, user_agent, headers=None, header_name=None, header_value=None):
+async def async_load_data(hass, url, user_agent, headers=None, header_name=None, header_value=None, verbose=False):
 	"""Load data from URL, exported to const to call it from sensor and from config_flow."""
-	return await hass.async_add_executor_job(_load_data, url, user_agent, headers, header_name, header_value)
+	return await hass.async_add_executor_job(_load_data, url, user_agent, headers, header_name, header_value, verbose)
