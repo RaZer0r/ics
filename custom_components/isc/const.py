@@ -217,9 +217,28 @@ async def check_data(user_input, hass, own_id=None):
 		try:
 			# build headers dict from possible sources
 			_headers = {}
-			# YAML/config may provide mapping
-			if CONF_HEADERS in user_input and isinstance(user_input[CONF_HEADERS], dict):
-				_headers.update(user_input[CONF_HEADERS])
+			# YAML/config may provide mapping or UI may provide a string — normalize both
+			if CONF_HEADERS in user_input:
+				val = user_input[CONF_HEADERS]
+				if isinstance(val, dict):
+					_headers.update(val)
+				elif isinstance(val, str):
+					val = val.strip()
+					if val != "":
+						# try JSON first
+						try:
+							import json
+							parsed = json.loads(val)
+							if isinstance(parsed, dict):
+								_headers.update(parsed)
+						except Exception:
+							# parse lines like 'Name: Value'
+							headers = {}
+							for line in val.splitlines():
+								if ':' in line:
+									k, v = line.split(':', 1)
+									headers[k.strip()] = v.strip()
+								_headers.update(headers)
 			# single header fields (backwards compat)
 			if user_input.get(CONF_HEADER_NAME):
 				_headers[user_input.get(CONF_HEADER_NAME)] = user_input.get(CONF_HEADER_VALUE, "")
